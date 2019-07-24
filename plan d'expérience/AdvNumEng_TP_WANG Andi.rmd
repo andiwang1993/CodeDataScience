@@ -1,0 +1,210 @@
+---
+title: "AdvNumEng_TP_WANG Andi"
+author:WANG Andi
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Preliminary sampling of model
+0. Build a first design of experiments based on 100 random simulations. Plot.
+??? scatter plot: pairs(), pairsD3::pairsD3()
+??? parallel coordinates plot: MASS::parcoord(), parcoords::parcoords() or plotly::plot_ly
+
+we can build each column of the design with random number, so we have:
+```{r cars}
+x<-runif(100,0,1)
+y<-runif(100,0,1)
+z<-runif(100,0,1)
+a<-runif(100,0,1)
+p<-runif(100,0,1)
+mat<-cbind(x,y,z,a,p)
+colnames(mat)<-c("x","y","z","a","p")
+wls<-compute_wls(mat)
+```
+
+then we plot the matrix:
+```{r mat,echo=FALSE}
+pairs(cbind(mat,wls))
+```
+
+```{r mat,echo=FALSE}
+library(pairsD3)
+pairsD3(cbind(mat,wls))
+```
+
+```{r mat,echo=FALSE}
+library(MASS)
+parcoord(cbind(mat,wls))
+```
+
+
+if we use the seq for getting the variables a and p we have the result:
+```{r cars}
+xx<-runif(100,0,1)
+yy<-runif(100,0,1)
+zz<-runif(100,0,1)
+aapp<-expand.grid(seq(0,1,length=10), seq(0,1,length=10))
+mat1<-cbind(x,y,z,aapp)
+colnames(mat1)<-c("x","y","z","a","p")
+wls1<-compute_wls(mat1)
+```
+
+then we plot the matrix:
+```{r mat1,echo=FALSE}
+pairs(cbind(mat1,wls1))
+```
+
+```{r mat1,echo=FALSE}
+library(pairsD3)
+pairsD3(cbind(mat1,wls1))
+```
+
+```{r mat1,echo=FALSE}
+library(MASS)
+parcoord(cbind(mat1,wls1))
+```
+
+Magma chamber optimization
+1. Perform an optimization of the magma chamber to find a first calibrated magma chamber (wls < ???1.5)
+Full identification of magma chamber
+
+for this question we need to use the model EGO which we have used in the class, so that we have the code:
+
+```{r cars}
+source("mainScript_DatascienceClass.R")
+library(DiceOptim)
+set.seed(123)
+
+# a 9-points factorial design, and the corresponding response
+d <- 5
+n <- 100
+x1<-runif(100,0,1)
+x2<-runif(100,0,1)
+x3<-runif(100,0,1)
+design.fact <- cbind(x1,x2,x3,expand.grid(seq(0,1,length=10), seq(0,1,length=10)))
+
+design.fact <- data.frame(design.fact)
+names(design.fact)<-c("x", "y","z","a","p")
+response.branin <- data.frame(apply(design.fact, 1, compute_wls))
+names(response.branin) <- "y"
+
+# model identification
+fitted.model1 <- km(~1, design=design.fact, response=response.branin,
+                    covtype="matern5_2", control=list(pop.size=50,trace=FALSE), parinit=c(0.5, 0.5))
+
+### EGO##################
+library(rgenoud)
+nsteps <- 100
+lower <- rep(0,d)
+upper <- rep(1,d)
+oEGO <- EGO.nsteps(model=fitted.model1, fun=compute_wls, nsteps=nsteps,
+                   lower=lower, upper=upper, control=list(pop.size=20, BFGSburnin=2))
+print(oEGO$par)
+print(oEGO$value)
+
+```
+we can get 100 points when we set the nsteps=100, we find the point in these result of which the value of y< -1.5
+
+```{r cars}
+matwls<-oEGO$value
+matpt<-oEGO$par
+
+index<-(which(matwls< -1.5))
+
+matopt<-matpt[index,]
+matopt
+```
+
+plot the entire optimization model:
+```{r wls,echo=FALSE}
+op<-par(mfrow=c(2,3))
+plot(matpt[,1],matwls-mean(matwls))
+
+lines(smooth.spline(matpt[,1],matwls-mean(matwls)),col='red')
+plot(matpt[,2],matwls-mean(matwls))
+lines(smooth.spline(matpt[,2],matwls-mean(matwls)),col='red')
+plot(matpt[,3],matwls-mean(matwls))
+lines(smooth.spline(matpt[,3],matwls-mean(matwls)),col='red')
+plot(matpt[,4],matwls-mean(matwls))
+lines(smooth.spline(matpt[,4],matwls-mean(matwls)),col='red')
+plot(matpt[,5],matwls-mean(matwls2))
+lines(smooth.spline(matpt[,5],matwls-mean(matwls)),col='red')
+par(op)
+
+```
+
+2. Based on previous design, build a meta-model and plot it. Propose a target level for inversion (considering previous optimization results)
+
+```{r cars}
+mat2<-expand.grid(matopt[,1],matopt[,2],matopt[,3],matopt[,4],matopt[,5])
+matwls2<-compute_wls(mat2)
+
+```
+```{r cars}
+matwls2
+min(matwls2)
+```
+```{r wls,echo=FALSE}
+op<-par(mfrow=c(2,3))
+plot(mat2[,1],matwls2-mean(matwls2))
+
+lines(smooth.spline(mat2[,1],matwls2-mean(matwls2)),col='red')
+plot(mat2[,2],matwls2-mean(matwls2))
+lines(smooth.spline(mat2[,2],matwls2-mean(matwls2)),col='red')
+plot(mat2[,3],matwls2-mean(matwls2))
+lines(smooth.spline(mat2[,3],matwls2-mean(matwls2)),col='red')
+plot(mat2[,4],matwls2-mean(matwls2))
+lines(smooth.spline(mat2[,4],matwls2-mean(matwls2)),col='red')
+plot(mat2[,5],matwls2-mean(matwls2))
+lines(smooth.spline(mat2[,5],matwls2-mean(matwls2)),col='red')
+par(op)
+
+```
+in this question, we need to find a value for T which is the level for inversion, by the results that we got from the prior question, we choose wls<-2.645 for inversion.
+
+
+3. Using Bichon criterion (from KrigInv package), propose next simulation. Iterate. Plot.
+```{r cars}
+library(KrigInv)
+set.seed(123)
+lower <- rep(0,d)
+upper <- rep(1,d)
+mbichon<-max_infill_criterion(lower=lower, upper=upper,method = "bichon",T=-2.64519,model=fitted.model1)
+
+```
+```{r cars}
+mbichon$par
+mat3<-cbind(runif(1000,0,1),runif(1000,0,1),runif(1000,0,1),runif(1000,0,1),runif(1000,0,1))
+
+mat3<-as.matrix(mat3)
+
+```
+```{r bichon,echo=FALSE}
+
+```
+4. Using SUR criterion (from KrigInv package), propose next simulation. Iterate by batch (size=10).Plot.
+```{r cars}
+set.seed(123)
+lower <- rep(0,d)
+upper <- rep(1,d)
+msur<-max_sur(lower, upper, optimcontrol = NULL, 
+integration.param = NULL, T=-2.64519, model=fitted.model1, 
+new.noise.var = 0, real.volume.variance = FALSE, real.volume.constant = FALSE)
+```
+```{r cars}
+msur$par
+mat4<-cbind(runif(1000,0,1),runif(1000,0,1),runif(1000,0,1),runif(1000,0,1),runif(1000,0,1))
+
+mat4<-as.matrix(mat4)
+
+```
+```{r bichon,echo=FALSE}
+
+
+```
+5. Compare and analyse results of 3. & 4.
+
+when we observe the images and the results gotten from question 4 and question 3, we can find that there are great difference of the effet of each variable.
+for the question 3 we can find that x, y, p is more important to the wls, and for the question 5, we will see that y,z are more important.
